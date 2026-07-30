@@ -69,7 +69,15 @@ func (r *Runner) Start(cfg bench.Config) error {
 	rep := bench.NewStreamReport()
 	rep.Start()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// Enforce cfg.Duration: use WithTimeout so the context auto-cancels
+	// when the configured duration elapses.
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if cfg.Duration > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), cfg.Duration)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
 	r.cancel = cancel
 	r.req = req
 	r.report = rep

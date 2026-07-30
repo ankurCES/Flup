@@ -89,15 +89,16 @@ func (r *RequesterH2) Run(ctx context.Context) error {
 		return err
 	}
 
-	var (
-		limiter *rate.Limiter
-		budget  int64
-	)
+	var limiter *rate.Limiter
 	if r.Cfg.RatePtr != nil {
 		limiter = rate.NewLimiter(*r.Cfg.RatePtr, int(r.Cfg.Concurrency))
 	}
+
+	// budget is nil when Requests==0 (run forever); non-nil otherwise.
+	var budget *int64
 	if r.Cfg.Requests > 0 {
-		budget = r.Cfg.Requests
+		b := r.Cfg.Requests
+		budget = &b
 	}
 
 	var wg sync.WaitGroup
@@ -105,7 +106,7 @@ func (r *RequesterH2) Run(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r.runWorker(ctx, body, bodyLen, limiter, &budget)
+			r.runWorker(ctx, body, bodyLen, limiter, budget)
 		}()
 	}
 	wg.Wait()

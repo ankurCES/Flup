@@ -100,38 +100,34 @@ func (r *Requester) Run(ctx context.Context) error {
 		return err
 	}
 
-	var (
-		limiter *rate.Limiter
-		budget  int64
-	)
+	var limiter *rate.Limiter
 	if r.Cfg.RatePtr != nil {
 		limiter = rate.NewLimiter(*r.Cfg.RatePtr, int(r.Cfg.Concurrency))
 	}
+
+	// budget is nil when Requests==0 (run forever); non-nil otherwise.
+	var budget *int64
 	if r.Cfg.Requests > 0 {
-		budget = r.Cfg.Requests
+		b := r.Cfg.Requests
+		budget = &b
 	}
 
 	var wg sync.WaitGroup
 
-	// optional ramp-up: open a new connection every second until target reached
-	startConns := 1
-	if r.Cfg.RampUp > 0 {
-		startConns = 1
-	}
-
-	for i := 0; i < startConns; i++ {
+	spawn := func(idx int) {
 		wg.Add(1)
-		go func(idx int) {
+		go func() {
 			defer wg.Done()
-			r.runWorker(ctx, idx, req, limiter, &budget)
-		}(i)
+			r.runWorker(ctx, idx, req, limiter, budget)
+		}()
 	}
 
 	if r.Cfg.RampUp > 0 {
-		// incremental ramp until we reach target concurrency
+		// Ramp-up: start 1, add RampUp connections per second
+		spawn(0)
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
-		opened := startConns
+		opened := 1
 		for {
 			select {
 			case <-ctx.Done():
@@ -143,18 +139,22 @@ func (r *Requester) Run(ctx context.Context) error {
 					ticker.Stop()
 					continue
 				}
-				for i := opened; i < r.Cfg.Concurrency && i < opened+r.Cfg.RampUp; i++ {
-					wg.Add(1)
-					go func(idx int) {
-						defer wg.Done()
-						r.runWorker(ctx, idx, req, limiter, &budget)
-					}(i)
-					opened = i + 1
+				end := opened + r.Cfg.RampUp
+				if end > r.Cfg.Concurrency {
+					end = r.Cfg.Concurrency
 				}
+				for i := opened; i < end; i++ {
+					spawn(i)
+				}
+				opened = end
 			}
 		}
 	}
 
+	// No ramp-up: spawn all workers immediately
+	for i := 0; i < r.Cfg.Concurrency; i++ {
+		spawn(i)
+	}
 	wg.Wait()
 	close(r.recCh)
 	return nil
