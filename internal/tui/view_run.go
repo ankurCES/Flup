@@ -48,6 +48,7 @@ var runFields = []struct {
 	{"Headers", "", "K: V, comma separated"},
 	{"Timeout", "5s", "Per-request timeout"},
 	{"Insecure", "false", "Skip TLS verify (true/false)"},
+	{"HTTP/2", "false", "Use HTTP/2 (true/false)"},
 }
 
 func newRunView() *runView {
@@ -210,6 +211,9 @@ func (v *runView) readConfig() (bench.Config, error) {
 	}
 	if k := strings.EqualFold(get(10), "true"); k {
 		c.Insecure = true
+	}
+	if strings.EqualFold(get(11), "true") {
+		c.HTTP2 = true
 	}
 	return c, c.Validate()
 }

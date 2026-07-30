@@ -33,6 +33,7 @@ type Config struct {
 	ReqTimeout    time.Duration
 	RespTimeout   time.Duration
 	Insecure      bool
+	HTTP2         bool   // use net/http with ForceAttemptHTTP2
 	CertPath      string
 	KeyPath       string
 	UnixSocket    string

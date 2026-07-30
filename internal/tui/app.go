@@ -31,14 +31,15 @@ func tick() tea.Cmd {
 // App is the bubbletea root model. It owns the runner, the history
 // store, the active view, and dispatches keys + ticks.
 type App struct {
-	runner *Runner
-	store  *HistoryStore
-	km     KeyMap
-	tab    int
-	views  []View
-	width  int
-	height int
-	ready  bool
+	runner  *Runner
+	store   *HistoryStore
+	km      KeyMap
+	tab     int
+	views   []View
+	width   int
+	height  int
+	ready   bool
+	export  *exportOverlay
 }
 
 func newApp() *App {
@@ -63,6 +64,7 @@ func NewApp() *App {
 		newErrorsView(),
 		newHistoryView(store),
 	}
+	a.export = newExportOverlay()
 	return a
 }
 
@@ -101,7 +103,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, tick())
 	case tea.KeyMsg:
+		// Export overlay intercepts all keys while active
+		if a.export.active {
+			a.export.handleKey(msg, a.env())
+			return a, nil
+		}
 		switch msg.String() {
+		case "e":
+			// 'e' opens export on any results tab (not Run/History)
+			if a.tab != TabRun && a.tab != TabHistory {
+				a.export.toggle()
+				return a, nil
+			}
 		case "q", "ctrl+c":
 			a.runner.Stop()
 			return a, tea.Quit
@@ -180,6 +193,17 @@ func (a *App) View() string {
 		bodyH = 5
 	}
 	body := a.views[a.tab].View(a.width, bodyH)
+
+	// Export overlay
+	if a.export.active {
+		body = a.export.view(a.width, bodyH)
+	}
+
+	// Export status line
+	if sl := a.export.statusLine(); sl != "" {
+		footer = lipgloss.JoinHorizontal(lipgloss.Top, sl, "  ", footer)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		tabs,
@@ -216,6 +240,10 @@ func (a *App) footerView() string {
 	parts := make([]string, 0, len(keys)+2)
 	for _, k := range keys {
 		parts = append(parts, styles.Tag.Render(k.Help().Key), styles.TagAlt.Render(k.Help().Desc))
+	}
+	// Export hint on results tabs
+	if a.tab != TabRun && a.tab != TabHistory {
+		parts = append(parts, styles.Tag.Render("e"), styles.TagAlt.Render("export"))
 	}
 	if a.runner.IsRunning() {
 		parts = append(parts, styles.Tag.Render("●"), styles.OK.Render("running"))

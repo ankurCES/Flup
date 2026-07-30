@@ -9,13 +9,20 @@ import (
 	"github.com/ankurCES/Flup/internal/bench"
 )
 
+// benchRequester is the common subset both Requester and RequesterH2 expose.
+type benchRequester interface {
+	Rec() <-chan *bench.Record
+	Errors() <-chan error
+	Run(ctx context.Context) error
+}
+
 // Runner owns the live benchmark lifecycle: the configured requester,
 // its goroutine pool, the snapshot report, and a single cancel func the
 // TUI uses to Stop(). A second Start() while running is a no-op.
 type Runner struct {
 	mu       sync.Mutex
 	cancel   context.CancelFunc
-	req      *bench.Requester
+	req      benchRequester
 	report   *bench.StreamReport
 	state    int32 // 0 idle, 1 running, 2 stopping
 	startCh  chan struct{}
@@ -44,9 +51,21 @@ func (r *Runner) Start(cfg bench.Config) error {
 	if atomic.LoadInt32(&r.state) != 0 {
 		return nil // already running
 	}
-	req, err := bench.New(cfg)
-	if err != nil {
-		return err
+
+	// Choose requester: HTTP/2 uses net/http; default uses fasthttp.
+	var req benchRequester
+	if cfg.HTTP2 {
+		h2, err := bench.NewH2(cfg)
+		if err != nil {
+			return err
+		}
+		req = h2
+	} else {
+		fh, err := bench.New(cfg)
+		if err != nil {
+			return err
+		}
+		req = fh
 	}
 	rep := bench.NewStreamReport()
 	rep.Start()
