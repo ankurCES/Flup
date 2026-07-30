@@ -80,6 +80,9 @@ func (v *historyView) Update(msg tea.Msg, env *Env) (tea.Cmd, bool) {
 }
 
 func (v *historyView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	hdr := styles.CardTitle.Render("Past benchmarks — enter to load, d to delete")
 	body := hdr + "\n" + v.list.View()
 	if v.loaded.ID != "" {

@@ -21,6 +21,9 @@ func (v *errorsView) Update(_ tea.Msg, _ *Env) (tea.Cmd, bool) {
 }
 
 func (v *errorsView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	s := lastSnap()
 	hdr := styles.CardTitle.Render("Errors & non-2xx codes")
 

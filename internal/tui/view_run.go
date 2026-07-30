@@ -370,6 +370,9 @@ func (v *runView) stop(env *Env) {
 }
 
 func (v *runView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	header := lipgloss.JoinHorizontal(lipgloss.Top,
 		styles.CardTitle.Render("Benchmark configuration"),
 		"  ",

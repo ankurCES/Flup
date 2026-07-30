@@ -21,6 +21,9 @@ func (v *percentilesView) Update(_ tea.Msg, _ *Env) (tea.Cmd, bool) {
 }
 
 func (v *percentilesView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	s := lastSnap()
 	hdr := styles.CardTitle.Render("Latency percentiles")
 

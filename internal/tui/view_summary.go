@@ -22,6 +22,9 @@ func (v *summaryView) Init() tea.Cmd  { return nil }
 func (v *summaryView) Update(_ tea.Msg, _ *Env) (tea.Cmd, bool) { return nil, false }
 
 func (v *summaryView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	s := lastSnap()
 	hdr := styles.CardTitle.Render("Summary")
 	if s == nil {

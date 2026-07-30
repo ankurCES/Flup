@@ -50,6 +50,9 @@ func (v *liveView) updateRPS(s *bench.Snapshot) {
 }
 
 func (v *liveView) View(w, h int) string {
+	if v == nil {
+		return ""
+	}
 	s := currentSnap()
 	hdr := styles.CardTitle.Render("Live — last 1s rollup")
 	if s == nil {

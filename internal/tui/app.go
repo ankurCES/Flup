@@ -212,6 +212,9 @@ func (a *App) refreshFocus() {
 }
 
 func (a *App) View() string {
+	if a == nil {
+		return ""
+	}
 	if !a.ready {
 		return styles.App.Render("loading…")
 	}
