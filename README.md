@@ -43,6 +43,14 @@
 
 ## 📦 Install
 
+### One-liner (Linux / macOS / WSL)
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/ankurCES/Flup/main/install.sh | sh
+```
+
+This auto-installs Go ≥ 1.23 if missing, builds `flup` from source, and drops the binary into `/usr/local/bin`. Set `INSTALL_DIR` to change the target: `curl … | INSTALL_DIR=~/.local/bin sh`.
+
 ### Using `go install`
 
 ```bash
