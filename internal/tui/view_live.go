@@ -52,6 +52,9 @@ func (v *liveView) updateRPS(s *bench.Snapshot) {
 func (v *liveView) View(w, h int) string {
 	s := currentSnap()
 	hdr := styles.CardTitle.Render("Live — last 1s rollup")
+	if s == nil {
+		return styles.Card.Width(w - 2).Render(hdr + "\n\n" + styles.Muted.Render("no data yet"))
+	}
 
 	// header metrics
 	metrics := kvGrid([][2]string{

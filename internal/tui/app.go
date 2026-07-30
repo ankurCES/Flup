@@ -86,16 +86,20 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width, a.height = msg.Width, msg.Height
 		a.ready = true
-		env := a.env()
-		_, _ = a.views[a.tab].Update(msg, env)
+		if a.tab >= 0 && a.tab < len(a.views) && a.views[a.tab] != nil {
+			env := a.env()
+			_, _ = a.views[a.tab].Update(msg, env)
+		}
 		return a, nil
 	case tickMsg:
 		// pull latest snapshot into shared state for the read-only views
 		s := a.runner.Snapshot()
 		setLastSnap(s)
 		// refresh live sparkline
-		if lv, ok := a.views[TabLive].(*liveView); ok {
-			lv.updateRPS(s)
+		if TabLive < len(a.views) {
+			if lv, ok := a.views[TabLive].(*liveView); ok && lv != nil {
+				lv.updateRPS(s)
+			}
 		}
 		cmds = append(cmds, tick())
 	case tea.KeyMsg:
@@ -218,7 +222,15 @@ func (a *App) View() string {
 	if bodyH < 5 {
 		bodyH = 5
 	}
-	body := a.views[a.tab].View(a.width, bodyH)
+
+	// Guard: views slice or current tab could be out of range during
+	// initialisation or a race between resize and tab switch.
+	var body string
+	if len(a.views) == 0 || a.tab < 0 || a.tab >= len(a.views) || a.views[a.tab] == nil {
+		body = styles.Card.Width(a.width - 2).Render(styles.Muted.Render("Loading…"))
+	} else {
+		body = a.views[a.tab].View(a.width, bodyH)
+	}
 
 	// Export overlay
 	if a.export.active {
