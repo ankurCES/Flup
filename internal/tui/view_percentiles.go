@@ -38,19 +38,20 @@ func (v *percentilesView) View(w, h int) string {
 	}
 	for _, p := range s.Percentiles {
 		lbl := fmt.Sprintf("P%.2f", p.P*100)
-		if p.P == 0.5 {
+		switch p.P {
+		case 0.5:
 			lbl = "P50"
-		} else if p.P == 0.75 {
+		case 0.75:
 			lbl = "P75"
-		} else if p.P == 0.9 {
+		case 0.9:
 			lbl = "P90"
-		} else if p.P == 0.95 {
+		case 0.95:
 			lbl = "P95"
-		} else if p.P == 0.99 {
+		case 0.99:
 			lbl = "P99"
-		} else if p.P == 0.999 {
+		case 0.999:
 			lbl = "P99.9"
-		} else if p.P == 0.9999 {
+		case 0.9999:
 			lbl = "P99.99"
 		}
 		bar := styles.Bar(barLen(p.Latency, maxLat, 30), 30, styles.Primary, styles.MutedColor)

@@ -35,17 +35,29 @@ func New(cfg Config) (*Requester, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
 	c := &fasthttp.Client{
 		NoDefaultUserAgentHeader:      true,
 		DisableHeaderNamesNormalizing: true,
 		DisablePathNormalizing:        true,
+		ReadTimeout:                   timeout,
+		WriteTimeout:                  timeout,
+		MaxConnDuration:               timeout,
 	}
-	if cfg.Timeout > 0 {
-		c.MaxConnDuration = cfg.Timeout
+	if cfg.MaxConnsPerHost > 0 {
+		c.MaxConnsPerHost = cfg.MaxConnsPerHost
+	} else {
+		// Default: 2× concurrency for headroom
+		c.MaxConnsPerHost = cfg.Concurrency * 2
+		if c.MaxConnsPerHost < 512 {
+			c.MaxConnsPerHost = 512
+		}
 	}
-	if cfg.DialTimeout > 0 {
-		// fasthttp's Dial; v1.55 supports MaxIdleConnDuration but
-		// dial timeout is exposed via Dial
+	if !cfg.KeepAlive {
+		c.MaxIdleConnDuration = 1 * time.Millisecond // effectively disable keep-alive
 	}
 	if cfg.Insecure {
 		c.TLSConfig.InsecureSkipVerify = true
@@ -157,9 +169,6 @@ func (r *Requester) runWorker(ctx context.Context, idx int, req *fasthttp.Reques
 		if ctx.Err() != nil {
 			return
 		}
-		if r.Cfg.Duration > 0 {
-			// checked inside the worker; cheap and clean
-		}
 		if budget != nil && atomic.AddInt64(budget, -1) < 0 {
 			atomic.AddInt64(budget, 1)
 			return
@@ -183,12 +192,18 @@ func (r *Requester) runWorker(ctx context.Context, idx int, req *fasthttp.Reques
 		}
 		if err == nil {
 			rec.Code = resp.StatusCode()
-			rec.ReadBytes = int64(len(resp.Body()))
+			bodyBytes := resp.Body()
+			rec.ReadBytes = int64(len(bodyBytes))
+			// Response validation
+			if verr := validateResponse(r.Cfg, rec.Code, bodyBytes); verr != "" {
+				rec.Error = verr
+			}
 		} else {
 			rec.Error = simplifyErr(err)
 		}
 		// write-byte estimate: header + body length of request
 		hdrBytes := 0
+		//nolint:staticcheck // VisitAll is deprecated but kept for byte-budget math
 		req.Header.VisitAll(func(k, v []byte) {
 			hdrBytes += len(k) + len(v) + 4 // ": \r\n"
 		})
@@ -249,7 +264,9 @@ func (r *Requester) buildRequest() (*fasthttp.Request, error) {
 				req.SetBodyStream(f, -1)
 			} else {
 				b, err := io.ReadAll(f)
-				f.Close()
+				if closeErr := f.Close(); closeErr != nil && err == nil {
+					err = closeErr
+				}
 				if err != nil {
 					return nil, err
 				}

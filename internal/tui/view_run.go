@@ -49,6 +49,11 @@ var runFields = []struct {
 	{"Timeout", "5s", "Per-request timeout"},
 	{"Insecure", "false", "Skip TLS verify (true/false)"},
 	{"HTTP/2", "false", "Use HTTP/2 (true/false)"},
+	{"Expect Status", "", "Expected HTTP status (e.g. 200)"},
+	{"Expect Body", "", "Response must contain this string"},
+	{"Timeout", "30s", "Per-request timeout (e.g. 10s, 500ms)"},
+	{"Keep-Alive", "true", "Reuse connections (true/false)"},
+	{"Max Conns", "", "Max connections per host (0 = auto)"},
 }
 
 func newRunView() *runView {
@@ -215,6 +220,31 @@ func (v *runView) readConfig() (bench.Config, error) {
 	if strings.EqualFold(get(11), "true") {
 		c.HTTP2 = true
 	}
+	// Response validation
+	if es := get(12); es != "" {
+		sc, err := strconv.Atoi(es)
+		if err != nil {
+			return c, fmt.Errorf("bad expect status: %w", err)
+		}
+		c.ExpectStatus = sc
+	}
+	c.ExpectBody = get(13)
+	// Connection tuning
+	if ts := get(14); ts != "" {
+		td, err := time.ParseDuration(ts)
+		if err != nil {
+			return c, fmt.Errorf("bad timeout: %w", err)
+		}
+		c.Timeout = td
+	}
+	c.KeepAlive = !strings.EqualFold(get(15), "false") // default true
+	if mc := get(16); mc != "" {
+		n, err := strconv.Atoi(mc)
+		if err != nil {
+			return c, fmt.Errorf("bad max conns: %w", err)
+		}
+		c.MaxConnsPerHost = n
+	}
 	return c, c.Validate()
 }
 
@@ -227,6 +257,75 @@ func benchPace(s string) (*rateLimit, error) {
 		return nil, err
 	}
 	return lim, nil
+}
+
+// loadConfig populates the input fields from a saved bench.Config.
+func (v *runView) loadConfig(cfg bench.Config) {
+	set := func(i int, val string) {
+		if i < len(v.inputs) {
+			v.inputs[i].SetValue(val)
+		}
+	}
+	set(0, cfg.URL)
+	set(1, cfg.Method)
+	set(2, fmt.Sprint(cfg.Concurrency))
+	if cfg.Duration > 0 {
+		set(3, cfg.Duration.String())
+	} else {
+		set(3, "0s")
+	}
+	set(4, fmt.Sprint(cfg.Requests))
+	if cfg.RatePtr != nil {
+		set(5, fmt.Sprintf("%.0f/1s", float64(*cfg.RatePtr)))
+	} else {
+		set(5, "infinity")
+	}
+	set(6, cfg.Body)
+	set(7, cfg.ContentType)
+	// Headers (skip Content-Type since it's field 7)
+	hdrs := make([]string, 0)
+	for _, h := range cfg.Headers {
+		if !strings.HasPrefix(strings.ToLower(h), "content-type:") {
+			hdrs = append(hdrs, h)
+		}
+	}
+	set(8, strings.Join(hdrs, ", "))
+	if cfg.Timeout > 0 {
+		set(9, cfg.Timeout.String())
+	} else {
+		set(9, "5s")
+	}
+	if cfg.Insecure {
+		set(10, "true")
+	} else {
+		set(10, "false")
+	}
+	if cfg.HTTP2 {
+		set(11, "true")
+	} else {
+		set(11, "false")
+	}
+	if cfg.ExpectStatus != 0 {
+		set(12, fmt.Sprint(cfg.ExpectStatus))
+	} else {
+		set(12, "")
+	}
+	set(13, cfg.ExpectBody)
+	if cfg.Timeout > 0 {
+		set(14, cfg.Timeout.String())
+	} else {
+		set(14, "30s")
+	}
+	if cfg.KeepAlive {
+		set(15, "true")
+	} else {
+		set(15, "false")
+	}
+	if cfg.MaxConnsPerHost > 0 {
+		set(16, fmt.Sprint(cfg.MaxConnsPerHost))
+	} else {
+		set(16, "")
+	}
 }
 
 func (v *runView) start(env *Env) {

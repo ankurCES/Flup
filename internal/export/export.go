@@ -191,42 +191,42 @@ func (r Report) ToMarkdown() ([]byte, error) {
 	var b strings.Builder
 
 	b.WriteString("# Flup Benchmark Report\n\n")
-	b.WriteString(fmt.Sprintf("**URL:** `%s`  \n", r.URL))
-	b.WriteString(fmt.Sprintf("**Method:** `%s`  \n", r.Method))
-	b.WriteString(fmt.Sprintf("**Concurrency:** %d  \n", r.Concurrency))
-	b.WriteString(fmt.Sprintf("**Duration:** %s  \n", r.Duration))
-	b.WriteString(fmt.Sprintf("**Timestamp:** %s  \n\n", r.Timestamp.Format(time.RFC3339)))
+	fmt.Fprintf(&b, "**URL:** `%s`  \n", r.URL)
+	fmt.Fprintf(&b, "**Method:** `%s`  \n", r.Method)
+	fmt.Fprintf(&b, "**Concurrency:** %d  \n", r.Concurrency)
+	fmt.Fprintf(&b, "**Duration:** %s  \n", r.Duration)
+	fmt.Fprintf(&b, "**Timestamp:** %s  \n\n", r.Timestamp.Format(time.RFC3339))
 
 	// Summary table
 	b.WriteString("## Summary\n\n")
 	b.WriteString("| Metric | Value |\n|--------|-------|\n")
-	b.WriteString(fmt.Sprintf("| Elapsed | %s |\n", r.Elapsed))
-	b.WriteString(fmt.Sprintf("| Total Requests | %d |\n", r.Count))
-	b.WriteString(fmt.Sprintf("| RPS | %.2f |\n", r.RPS))
-	b.WriteString(fmt.Sprintf("| Read Throughput | %.4f MB/s |\n", r.ReadMBps))
-	b.WriteString(fmt.Sprintf("| Write Throughput | %.4f MB/s |\n\n", r.WriteMBps))
+	fmt.Fprintf(&b, "| Elapsed | %s |\n", r.Elapsed)
+	fmt.Fprintf(&b, "| Total Requests | %d |\n", r.Count)
+	fmt.Fprintf(&b, "| RPS | %.2f |\n", r.RPS)
+	fmt.Fprintf(&b, "| Read Throughput | %.4f MB/s |\n", r.ReadMBps)
+	fmt.Fprintf(&b, "| Write Throughput | %.4f MB/s |\n\n", r.WriteMBps)
 
 	// Latency
 	b.WriteString("## Latency\n\n")
 	b.WriteString("| Stat | Value |\n|------|-------|\n")
-	b.WriteString(fmt.Sprintf("| Min | %s |\n", r.Latency.Min))
-	b.WriteString(fmt.Sprintf("| Mean | %s |\n", r.Latency.Mean))
-	b.WriteString(fmt.Sprintf("| StdDev | %s |\n", r.Latency.StdDev))
-	b.WriteString(fmt.Sprintf("| Max | %s |\n\n", r.Latency.Max))
+	fmt.Fprintf(&b, "| Min | %s |\n", r.Latency.Min)
+	fmt.Fprintf(&b, "| Mean | %s |\n", r.Latency.Mean)
+	fmt.Fprintf(&b, "| StdDev | %s |\n", r.Latency.StdDev)
+	fmt.Fprintf(&b, "| Max | %s |\n\n", r.Latency.Max)
 
 	// RPS Stats
 	b.WriteString("## RPS Statistics\n\n")
 	b.WriteString("| Stat | Value |\n|------|-------|\n")
-	b.WriteString(fmt.Sprintf("| Min | %.2f |\n", r.RPSStats.Min))
-	b.WriteString(fmt.Sprintf("| Mean | %.2f |\n", r.RPSStats.Mean))
-	b.WriteString(fmt.Sprintf("| StdDev | %.2f |\n", r.RPSStats.StdDev))
-	b.WriteString(fmt.Sprintf("| Max | %.2f |\n\n", r.RPSStats.Max))
+	fmt.Fprintf(&b, "| Min | %.2f |\n", r.RPSStats.Min)
+	fmt.Fprintf(&b, "| Mean | %.2f |\n", r.RPSStats.Mean)
+	fmt.Fprintf(&b, "| StdDev | %.2f |\n", r.RPSStats.StdDev)
+	fmt.Fprintf(&b, "| Max | %.2f |\n\n", r.RPSStats.Max)
 
 	// Percentiles
 	b.WriteString("## Latency Percentiles\n\n")
 	b.WriteString("| Percentile | Latency |\n|------------|----------|\n")
 	for _, p := range r.Percentiles {
-		b.WriteString(fmt.Sprintf("| %s | %s |\n", p.Label, p.Latency))
+		fmt.Fprintf(&b, "| %s | %s |\n", p.Label, p.Latency)
 	}
 	b.WriteString("\n")
 
@@ -234,7 +234,7 @@ func (r Report) ToMarkdown() ([]byte, error) {
 	b.WriteString("## Status Codes\n\n")
 	b.WriteString("| Code | Count |\n|------|-------|\n")
 	for k, v := range r.StatusCodes {
-		b.WriteString(fmt.Sprintf("| %s | %d |\n", k, v))
+		fmt.Fprintf(&b, "| %s | %d |\n", k, v)
 	}
 	b.WriteString("\n")
 
@@ -243,7 +243,7 @@ func (r Report) ToMarkdown() ([]byte, error) {
 		b.WriteString("## Errors\n\n")
 		b.WriteString("| Error | Count |\n|-------|-------|\n")
 		for k, v := range r.Errors {
-			b.WriteString(fmt.Sprintf("| %s | %d |\n", k, v))
+			fmt.Fprintf(&b, "| %s | %d |\n", k, v)
 		}
 		b.WriteString("\n")
 	}

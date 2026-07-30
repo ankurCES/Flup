@@ -38,6 +38,14 @@ type Config struct {
 	KeyPath       string
 	UnixSocket    string
 	RatePtr       *rate.Limit // populated by Pace if Rate is set; nil = no cap
+
+	// Connection tuning
+	KeepAlive       bool // reuse connections (default true)
+	MaxConnsPerHost int  // fasthttp max conns per host; 0 = runtime default
+
+	// Response validation — mismatches count as errors in the report.
+	ExpectStatus int    // 0 = don't check; e.g. 200
+	ExpectBody   string // "" = don't check; substring match on response body
 }
 
 // Validate returns the first user-visible error in the configuration.
@@ -49,9 +57,7 @@ func (c *Config) Validate() error {
 	if c.Concurrency < 1 {
 		return errors.New("concurrency must be >= 1")
 	}
-	if c.Duration == 0 && c.Requests == 0 {
-		// allowed — Ctrl-C stops it; plow treats this as "run forever"
-	}
+	// Duration==0 && Requests==0 allowed — Ctrl-C stops it; plow treats this as "run forever".
 	if c.Duration < 0 {
 		return errors.New("duration must be >= 0")
 	}

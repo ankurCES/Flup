@@ -7,7 +7,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/ankurCES/Flup/internal/bench"
 	"github.com/ankurCES/Flup/internal/history"
+	"github.com/ankurCES/Flup/internal/profiles"
 	"github.com/ankurCES/Flup/internal/styles"
 )
 
@@ -39,14 +41,12 @@ type App struct {
 	width   int
 	height  int
 	ready   bool
-	export  *exportOverlay
+	export   *exportOverlay
+	clip     *clipResult
+	profiles *profileOverlay
+	profDB   *profiles.Store
 }
 
-func newApp() *App {
-	return NewApp()
-}
-
-// NewApp is the exported constructor so main() can build the TUI.
 func NewApp() *App {
 	runner := NewRunner()
 	store, _ := history.Open()
@@ -65,6 +65,8 @@ func NewApp() *App {
 		newHistoryView(store),
 	}
 	a.export = newExportOverlay()
+	a.profiles = newProfileOverlay()
+	a.profDB, _ = profiles.Open()
 	return a
 }
 
@@ -89,26 +91,50 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case tickMsg:
 		// pull latest snapshot into shared state for the read-only views
-		if a.runner.IsRunning() || true {
-			s := a.runner.Snapshot()
-			setLastSnap(s)
-			// refresh live sparkline
-			if lv, ok := a.views[TabLive].(*liveView); ok {
-				lv.updateRPS(s)
-			}
-		}
-		// auto-save on stop
-		if !a.runner.IsRunning() && a.runner.Snapshot() != nil {
-			// No-op — saving is handled when the user presses stop.
+		s := a.runner.Snapshot()
+		setLastSnap(s)
+		// refresh live sparkline
+		if lv, ok := a.views[TabLive].(*liveView); ok {
+			lv.updateRPS(s)
 		}
 		cmds = append(cmds, tick())
 	case tea.KeyMsg:
+		// Profile overlay intercepts all keys while active
+		if a.profiles.active {
+			consumed, loadCfg := a.profiles.handleKey(msg, func() (bench.Config, error) {
+				if rv, ok := a.views[TabRun].(*runView); ok {
+					return rv.readConfig()
+				}
+				return bench.Config{}, fmt.Errorf("no run view")
+			})
+			if loadCfg != nil {
+				if rv, ok := a.views[TabRun].(*runView); ok {
+					rv.loadConfig(*loadCfg)
+				}
+			}
+			if consumed {
+				return a, nil
+			}
+		}
 		// Export overlay intercepts all keys while active
 		if a.export.active {
 			a.export.handleKey(msg, a.env())
 			return a, nil
 		}
 		switch msg.String() {
+		case "ctrl+p":
+			// Open profiles overlay on Run tab
+			if a.tab == TabRun && a.profDB != nil {
+				a.profiles.open(a.profDB)
+				return a, nil
+			}
+		case "y":
+			// 'y' (yank) copies results to clipboard on any results tab
+			if a.tab != TabRun && a.tab != TabHistory {
+				cr := copySnapshotToClipboard(a.runner.Config(), a.runner.Snapshot())
+				a.clip = &cr
+				return a, nil
+			}
 		case "e":
 			// 'e' opens export on any results tab (not Run/History)
 			if a.tab != TabRun && a.tab != TabHistory {
@@ -198,10 +224,28 @@ func (a *App) View() string {
 	if a.export.active {
 		body = a.export.view(a.width, bodyH)
 	}
+	// Profile overlay
+	if a.profiles.active {
+		body = a.profiles.view(a.width, bodyH)
+	}
 
 	// Export status line
 	if sl := a.export.statusLine(); sl != "" {
 		footer = lipgloss.JoinHorizontal(lipgloss.Top, sl, "  ", footer)
+	}
+	// Profile status line
+	if sl := a.profiles.statusLine(); sl != "" {
+		footer = lipgloss.JoinHorizontal(lipgloss.Top, sl, "  ", footer)
+	}
+	// Clipboard status line
+	if a.clip != nil {
+		if sl := a.clip.statusLine(); sl != "" {
+			sty := styles.Err
+			if a.clip.ok {
+				sty = styles.OK
+			}
+			footer = lipgloss.JoinHorizontal(lipgloss.Top, sty.Render(sl), "  ", footer)
+		}
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
@@ -241,9 +285,14 @@ func (a *App) footerView() string {
 	for _, k := range keys {
 		parts = append(parts, styles.Tag.Render(k.Help().Key), styles.TagAlt.Render(k.Help().Desc))
 	}
-	// Export hint on results tabs
+	// Export/copy hints on results tabs
 	if a.tab != TabRun && a.tab != TabHistory {
 		parts = append(parts, styles.Tag.Render("e"), styles.TagAlt.Render("export"))
+		parts = append(parts, styles.Tag.Render("y"), styles.TagAlt.Render("copy"))
+	}
+	// Profile hint on Run tab
+	if a.tab == TabRun {
+		parts = append(parts, styles.Tag.Render("C-p"), styles.TagAlt.Render("profiles"))
 	}
 	if a.runner.IsRunning() {
 		parts = append(parts, styles.Tag.Render("●"), styles.OK.Render("running"))

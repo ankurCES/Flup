@@ -32,15 +32,30 @@ func NewH2(cfg Config) (*RequesterH2, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	maxIdle := cfg.Concurrency * 2
+	if cfg.MaxConnsPerHost > 0 {
+		maxIdle = cfg.MaxConnsPerHost
+	}
+	if maxIdle < 512 {
+		maxIdle = 512
+	}
 	transport := &http.Transport{
-		MaxIdleConns:        cfg.Concurrency * 2,
-		MaxIdleConnsPerHost: cfg.Concurrency * 2,
+		MaxIdleConns:        maxIdle,
+		MaxIdleConnsPerHost: maxIdle,
+		MaxConnsPerHost:     maxIdle,
 		IdleConnTimeout:     90 * time.Second,
 		ForceAttemptHTTP2:   true,
+		DisableKeepAlives:   !cfg.KeepAlive,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: cfg.Insecure},
 	}
 	if cfg.DialTimeout > 0 {
 		transport.DialContext = (&net.Dialer{Timeout: cfg.DialTimeout}).DialContext
+	} else {
+		transport.DialContext = (&net.Dialer{Timeout: timeout}).DialContext
 	}
 	if cfg.UnixSocket != "" {
 		transport.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
@@ -50,7 +65,7 @@ func NewH2(cfg Config) (*RequesterH2, error) {
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   cfg.Timeout,
+		Timeout:   timeout,
 	}
 
 	return &RequesterH2{
@@ -130,9 +145,20 @@ func (r *RequesterH2) runWorker(ctx context.Context, body []byte, bodyLen int, l
 		}
 		if err == nil {
 			rec.Code = resp.StatusCode
-			n, _ := io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-			rec.ReadBytes = n
+			// Read body for validation and byte counting
+			var bodyBytes []byte
+			if r.Cfg.ExpectBody != "" {
+				bodyBytes, _ = io.ReadAll(resp.Body)
+				rec.ReadBytes = int64(len(bodyBytes))
+			} else {
+				n, _ := io.Copy(io.Discard, resp.Body)
+				rec.ReadBytes = n
+			}
+			_ = resp.Body.Close()
+			// Response validation
+			if verr := validateResponse(r.Cfg, rec.Code, bodyBytes); verr != "" {
+				rec.Error = verr
+			}
 		} else {
 			rec.Error = simplifyErr(err)
 		}

@@ -33,7 +33,6 @@ type Runner struct {
 	last   *bench.Snapshot
 
 	historySaved bool
-	savePath     string
 	cfg          bench.Config
 }
 
