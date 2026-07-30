@@ -101,6 +101,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lv.updateRPS(s)
 			}
 		}
+		// auto-stop: benchmark finished (duration/requests reached) but
+		// runView still thinks it's running → finalize
+		if rv, ok := a.views[TabRun].(*runView); ok && rv != nil {
+			if rv.running && !a.runner.IsRunning() {
+				rv.autoFinish(a.env())
+			}
+		}
 		cmds = append(cmds, tick())
 	case tea.KeyMsg:
 		// Profile overlay intercepts all keys while active
@@ -148,42 +155,31 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			a.runner.Stop()
 			return a, tea.Quit
-		case "1":
-			a.tab = TabRun
-			a.refreshFocus()
-			return a, nil
-		case "2":
-			a.tab = TabLive
-			a.refreshFocus()
-			return a, nil
-		case "3":
-			a.tab = TabSummary
-			a.refreshFocus()
-			return a, nil
-		case "4":
-			a.tab = TabPerc
-			a.refreshFocus()
-			return a, nil
-		case "5":
-			a.tab = TabHist
-			a.refreshFocus()
-			return a, nil
-		case "6":
-			a.tab = TabErrors
-			a.refreshFocus()
-			return a, nil
-		case "7":
-			a.tab = TabHistory
-			a.refreshFocus()
-			return a, nil
-		case "tab", "right":
+		case "right":
 			a.tab = (a.tab + 1) % len(a.views)
 			a.refreshFocus()
 			return a, nil
-		case "shift+tab", "left":
+		case "left":
 			a.tab = (a.tab - 1 + len(a.views)) % len(a.views)
 			a.refreshFocus()
 			return a, nil
+		case "tab":
+			// On the Run tab, tab cycles fields; elsewhere it switches tabs
+			if a.tab == TabRun {
+				// fall through — let runView handle it
+			} else {
+				a.tab = (a.tab + 1) % len(a.views)
+				a.refreshFocus()
+				return a, nil
+			}
+		case "shift+tab":
+			if a.tab == TabRun {
+				// fall through — let runView handle it
+			} else {
+				a.tab = (a.tab - 1 + len(a.views)) % len(a.views)
+				a.refreshFocus()
+				return a, nil
+			}
 		case "u":
 			setUseSec(!lastUseSec())
 			return a, nil
@@ -300,6 +296,8 @@ func (a *App) footerView() string {
 	for _, k := range keys {
 		parts = append(parts, styles.Tag.Render(k.Help().Key), styles.TagAlt.Render(k.Help().Desc))
 	}
+	// units toggle on all tabs
+	parts = append(parts, styles.Tag.Render("u"), styles.TagAlt.Render("units"))
 	// Export/copy hints on results tabs
 	if a.tab != TabRun && a.tab != TabHistory {
 		parts = append(parts, styles.Tag.Render("e"), styles.TagAlt.Render("export"))

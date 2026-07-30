@@ -358,6 +358,22 @@ func (v *runView) stop(env *Env) {
 	v.sw.Stop()
 
 	// save to history
+	v.saveHistory(env)
+}
+
+// autoFinish is called by the tick handler when the runner has stopped
+// (duration/requests exhausted) but the runView still thinks it's running.
+func (v *runView) autoFinish(env *Env) {
+	if !v.running {
+		return
+	}
+	v.running = false
+	v.finished = true
+	v.sw.Stop()
+	v.saveHistory(env)
+}
+
+func (v *runView) saveHistory(env *Env) {
 	if env.Store != nil {
 		snap := env.Runner.Snapshot()
 		if snap != nil {

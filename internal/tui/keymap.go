@@ -10,14 +10,7 @@ type KeyMap struct {
 	Quit key.Binding
 	Help key.Binding
 
-	// View switching (1=Run, 2=Live, 3=Summary, 4=Percentiles, 5=Histogram, 6=Errors, 7=History)
-	Tab1 key.Binding
-	Tab2 key.Binding
-	Tab3 key.Binding
-	Tab4 key.Binding
-	Tab5 key.Binding
-	Tab6 key.Binding
-	Tab7 key.Binding
+	// View switching (tab/shift+tab/arrow keys)
 	Next key.Binding
 	Prev key.Binding
 
@@ -47,15 +40,8 @@ func DefaultKeyMap() KeyMap {
 		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 
-		Tab1: key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "run")),
-		Tab2: key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "live")),
-		Tab3: key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "summary")),
-		Tab4: key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "perc.")),
-		Tab5: key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "histo.")),
-		Tab6: key.NewBinding(key.WithKeys("6"), key.WithHelp("6", "errors")),
-		Tab7: key.NewBinding(key.WithKeys("7"), key.WithHelp("7", "history")),
-		Next: key.NewBinding(key.WithKeys("tab", "right"), key.WithHelp("tab", "next")),
-		Prev: key.NewBinding(key.WithKeys("shift+tab", "left"), key.WithHelp("S-tab", "prev")),
+		Next: key.NewBinding(key.WithKeys("tab", "right"), key.WithHelp("→/tab", "next tab")),
+		Prev: key.NewBinding(key.WithKeys("shift+tab", "left"), key.WithHelp("←/S-tab", "prev tab")),
 
 		FocusNext: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
 		FocusPrev: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("S-tab", "prev field")),
@@ -64,7 +50,7 @@ func DefaultKeyMap() KeyMap {
 
 		Pause: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pause")),
 
-		Open:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+		Open:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Delete: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 		Back:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 
@@ -75,5 +61,5 @@ func DefaultKeyMap() KeyMap {
 
 // ShortGlobal returns a tight, single-line help snippet for the footer.
 func (k KeyMap) ShortGlobal() []key.Binding {
-	return []key.Binding{k.Tab1, k.Tab2, k.Tab3, k.Tab4, k.Tab5, k.Tab6, k.Tab7, k.Quit}
+	return []key.Binding{k.Prev, k.Next, k.Quit}
 }

@@ -83,12 +83,24 @@ func (v *historyView) View(w, h int) string {
 	if v == nil {
 		return ""
 	}
+	// Refresh list items from store so newly saved benchmarks appear.
+	v.refreshItems()
+
 	hdr := styles.CardTitle.Render("Past benchmarks — enter to load, d to delete")
 	body := hdr + "\n" + v.list.View()
 	if v.loaded.ID != "" {
 		body += "\n\n" + renderHistorySummary(v.loaded)
 	}
 	return styles.Card.Width(w - 2).Render(body)
+}
+
+// refreshItems syncs the list widget with the current store contents.
+func (v *historyView) refreshItems() {
+	if v.store == nil {
+		return
+	}
+	items := toItems(v.store.All())
+	v.list.SetItems(items)
 }
 
 func renderHistorySummary(e HistoryEntry) string {
